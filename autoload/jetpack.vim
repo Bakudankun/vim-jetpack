@@ -229,29 +229,7 @@ class Package
   enddef
 
   def ToDict(): dict<any>
-    return {
-      keys:	this.keys,
-      cmd:	this.cmd,
-      event:	this.event,
-      url:	this.url,
-      local:	this.local,
-      branch:	this.branch,
-      tag:	this.tag,
-      commit:	this.commit,
-      rtp:	this.rtp,
-      frozen:	this.frozen,
-      dir:	this.dir,
-      path:	this.path,
-      status:	this.status,
-      output:	this.output,
-      hook_add:	this.hook_add,
-      hook_source:	this.hook_source,
-      hook_post_source:	this.hook_post_source,
-      dependees:	this.dependees,
-      dependers_before:	this.dependers_before,
-      dependers_after:	this.dependers_after,
-      opt:	this.opt,
-    }
+    return {local: this.local, dir: this.dir, path: this.path}
   enddef
 endclass
 
