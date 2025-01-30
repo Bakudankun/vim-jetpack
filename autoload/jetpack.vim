@@ -753,7 +753,7 @@ export def End()
       const cmd_name = substitute(it, '^:', '', '')
       cmds[cmd_name] = add(get(cmds, cmd_name, []), pkg_name)
       const cmd = $'LoadCmd("{cmd_name}", {cmds[cmd_name]}, <f-args>)'
-      :execute 'command! -range -nargs=*' cmd_name ':' cmd
+      :execute 'command! -range -nargs=*' cmd_name cmd
     endfor
     if !empty(pkg.hook_source)
       const pattern = 'JetpackPre:' .. pkg_name
