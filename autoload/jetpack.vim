@@ -26,40 +26,17 @@ if exists('g:loaded_jetpack')
 endif
 g:loaded_jetpack = 1
 
-if has('vim9script')
-  def Execute(code: string)
-    if !code->trim()
-      return
-    endif
-    execute "function g:JetpackTemp() abort\n" .. code .. "\nendfunction"
-    try
-      execute 'g:JetpackTemp()'
-    finally
-      delfunction g:JetpackTemp
-    endtry
-  enddef
-elseif has('lua')
-  def Execute(code: string)
-    if !code->trim()
-      return
-    endif
-    g:jetpack_code = code
-    :lua vim.command(vim.g.jetpack_code)
-  enddef
-else
-  def Execute(code: string)
-    if !code->trim()
-      return
-    endif
-    const c = bufnr()
-    const t = bufadd('')
-    :execute 'silent buffer' t
-    setline(1, split(code, "\n"))
-    :source
-    :execute 'silent bwipeout!' t
-    :execute 'silent buffer' c
-  enddef
-endif
+def Execute(code: string)
+  if !code->trim()
+    return
+  endif
+  :execute "function g:JetpackTemp() abort\n" .. code .. "\nendfunction"
+  try
+    :execute 'g:JetpackTemp()'
+  finally
+    delfunction g:JetpackTemp
+  endtry
+enddef
 
 g:jetpack_njobs = get(g:, 'jetpack_njobs', 8)
 
@@ -488,7 +465,7 @@ def PostupdatePlugins()
       pkg.do()
     elseif type(pkg.do) == v:t_string
       if pkg.do =~ '^:'
-        execute pkg.do
+        :execute pkg.do
       else
         System(pkg.do)
       endif
@@ -496,7 +473,7 @@ def PostupdatePlugins()
     chdir(pwd)
   endfor
   for dir in glob(optdir .. '/*/doc', false, 1)
-    execute 'silent! helptags' dir
+    :execute 'silent! helptags' dir
   endfor
   mkdir(optdir .. '/_/plugin', 'p')
   mkdir(optdir .. '/_/after/plugin', 'p')
@@ -563,8 +540,8 @@ export def Begin(homepath: any = null)
   var home: string
   if !!homepath
     home = expand(homepath)
-    :execute 'set runtimepath^=' .. expand(home)
-    :execute 'set packpath^=' .. expand(home)
+    &runtimepath = $'{expand(home)},{&runtimepath}'
+    &packpath = $'{expand(home)},{&packpath}'
   elseif has('win32')
     home = expand('~/vimfiles')
   else
@@ -597,7 +574,7 @@ def Doautocmd(ord: string, pkg_name: string)
     const pattern_b = $'Jetpack{substitute(ord, '.*', '\u\0', '')}:{pkg_name}'
     for pattern in [pattern_a, pattern_b]
       if exists('#User#' .. pattern)
-        execute 'doautocmd <nomodeline> User' pattern
+        :execute 'doautocmd <nomodeline> User' pattern
       endif
     endfor
   endif
@@ -612,11 +589,11 @@ def LoadPlugin(pkg_name: string)
   if v:vim_did_enter
     Doautocmd('pre', pkg_name)
     for file in glob($'{pkg.path}/{pkg.rtp}/plugin/**/*.vim', false, 1)
-      execute 'source' file
+      :execute 'source' file
     endfor
   else
     const cmd = $'Doautocmd("pre", "{pkg_name}")'
-    execute 'autocmd Jetpack User JetpackPre:init ++once' cmd
+    :execute 'autocmd Jetpack User JetpackPre:init ++once' cmd
   endif
 enddef
 
@@ -625,12 +602,12 @@ def LoadAfterPlugin(pkg_name: string)
   &runtimepath = $'{&runtimepath},{pkg.path}/{pkg.rtp}'
   if v:vim_did_enter
     for file in glob($'{pkg.path}/{pkg.rtp}/after/plugin/**/*.vim', false, 1)
-      execute 'source' file
+      :execute 'source' file
     endfor
     Doautocmd('post', pkg_name)
   else
     const cmd = $'Doautocmd("post", "{pkg_name}")'
-    execute 'autocmd Jetpack User JetpackPost:init ++once' cmd
+    :execute 'autocmd Jetpack User JetpackPost:init ++once' cmd
   endif
   for dep_name in pkg.dependees
     LoadAfterPlugin(dep_name)
