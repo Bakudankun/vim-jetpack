@@ -45,6 +45,8 @@ g:jetpack_download_method =
   # curl: Use CURL to download
   # wget: Use Wget to download
 
+type PkgOpts = dict<any>
+
 enum Status
   pending,
   skipped,
@@ -80,7 +82,7 @@ class Package
   const dependers_after:	list<string>
   const opt:	bool
 
-  def new(plugin: string, opts: dict<any> = {})
+  def new(plugin: string, opts: PkgOpts = {})
     const name: string = Gets(opts, ['as', 'name'], [fnamemodify(plugin, ':t')])[0]
     if has_key(declared_packages, name)
       return
@@ -257,15 +259,15 @@ class Package
 endclass
 
 
-var cmds: dict<list<string>> = {}
-var maps: dict<list<string>> = {}
-var declared_packages: dict<Package> = {}
-var loaded_count: dict<number> = {}
-var available_packages: dict<dict<any>> = {}
+var cmds: dict<list<string>>
+var maps: dict<list<string>>
+var declared_packages: dict<Package>
+final loaded_count: dict<number> = {}
+var available_packages: dict<dict<any>>
 var optdir: string
 
 
-def ParseToml(lines: list<string>): list<dict<any>>
+def ParseToml(lines: list<string>): list<PkgOpts>
   final plugins = []
   var plugin = {}
   var key = ''
@@ -508,21 +510,21 @@ export def Sync()
   PostupdatePlugins()
 enddef
 
-def Gets(pkg: dict<any>, keys: list<string>, default: any): any
+def Gets(opts: PkgOpts, keys: list<string>, default: any): any
   final values: list<any> = []
   for key: string in keys
-    if has_key(pkg, key)
-      if type(pkg[key]) == v:t_list
-        extend(values, pkg[key])
+    if has_key(opts, key)
+      if type(opts[key]) == v:t_list
+        extend(values, opts[key])
       else
-        add(values, pkg[key])
+        add(values, opts[key])
       endif
     endif
   endfor
   return values ?? default
 enddef
 
-export def Add(plugin: string, opts: dict<any> = {})
+export def Add(plugin: string, opts: PkgOpts = {})
   Package.new(plugin, opts)
 enddef
 
