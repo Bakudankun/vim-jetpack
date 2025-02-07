@@ -32,7 +32,7 @@ def Execute(code: string)
   endif
   :execute "function g:JetpackTemp() abort\n" .. code .. "\nendfunction"
   try
-    :execute 'g:JetpackTemp()'
+    g:JetpackTemp()
   finally
     delfunction g:JetpackTemp
   endtry
@@ -71,7 +71,7 @@ class Package
   const dir:	string
   const path:	string
   final status:	list<Status> = [Status.pending]
-  public var output:	string = ''
+  var output:	string = ''
   const hook_add:	string
   const hook_source:	string
   const hook_post_source:	string
@@ -197,6 +197,42 @@ class Package
     endif
   enddef
 
+  def Download(jobs: list<job>)
+    if this.local
+      return
+    endif
+    ShowProgress('Install Plugins')
+    var status: Status
+    if isdirectory(this.path)
+      if this.frozen
+        add(this.status, Status.skipped)
+        return
+      endif
+      add(this.status, Status.updating)
+      status = Status.updated
+    else
+      add(this.status, Status.installing)
+      status = Status.installed
+    endif
+    final commands = this.MakeDownloadCmd()
+    if executable('sh') || executable('cmd.exe')
+      const cmd = [
+        (has('unix') ? 'sh' : 'cmd.exe'),
+        (has('unix') ? '-c' : '/c'),
+        join(commands, ' && ')
+      ]
+      const job = Jobstart(cmd, (output) => {
+        add(this.status, status)
+        this.output = output
+      })
+      add(jobs, job)
+      Jobwait(jobs, g:jetpack_njobs)
+    else
+      this.output = join(map(commands, (_, cmd) => System(cmd)), "\n")
+      add(this.status, status)
+    endif
+  enddef
+
   def IsOpt(): bool
     return !!this.dependers_before
       || !!this.dependers_after
@@ -207,6 +243,16 @@ class Package
 
   def ToDict(): dict<any>
     return {local: this.local, dir: this.dir, path: this.path}
+  enddef
+
+  # Original: https://github.com/junegunn/vim-plug/blob/e3001/plug.vim#L479-L529
+  #  License: MIT, https://raw.githubusercontent.com/junegunn/vim-plug/e3001/LICENSE
+  static def IsLocalPlug(repo: string): bool
+    if has('win32')
+      return repo =~? '^[a-z]:\|^[%~]'
+    else
+      return repo[0] =~ '[/$~]'
+    endif
   enddef
 endclass
 
@@ -265,12 +311,8 @@ def MakeProgressbar(n: float): string
   return '[' .. join(map(range(0, 100, 3), ((_, v) => v < n ? '=' : ' ')), '') .. ']'
 enddef
 
-def Jobstatus(job: job): string
-  return job_status(job)
-enddef
-
 def Jobcount(jobs: list<job>): number
-  return len(filter(copy(jobs), (_, val) => Jobstatus(val) == 'run'))
+  return len(filter(copy(jobs), (_, val) => job_status(val) == 'run'))
 enddef
 
 def Jobwait(jobs: list<job>, njobs: number)
@@ -398,39 +440,7 @@ def DownloadPlugins()
     add(pkg.status, Status.pending)
   endfor
   for [pkg_name, pkg] in items(declared_packages)
-    if pkg.local
-      continue
-    endif
-    ShowProgress('Install Plugins')
-    var status: Status
-    if isdirectory(pkg.path)
-      if pkg.frozen
-        add(pkg.status, Status.skipped)
-        continue
-      endif
-      add(pkg.status, Status.updating)
-      status = Status.updated
-    else
-      add(pkg.status, Status.installing)
-      status = Status.installed
-    endif
-    final commands = pkg.MakeDownloadCmd()
-    if executable('sh') || executable('cmd.exe')
-      const cmd = [
-        (has('unix') ? 'sh' : 'cmd.exe'),
-        (has('unix') ? '-c' : '/c'),
-        join(commands, ' && ')
-      ]
-      const job = Jobstart(cmd, function((s, p, output) => {
-        add(p.status, s)
-        p.output = output
-      }, [status, pkg]))
-      add(jobs, job)
-      Jobwait(jobs, g:jetpack_njobs)
-    else
-      pkg.output = join(map(commands, (_, cmd) => System(cmd)), "\n")
-      add(pkg.status, status)
-    endif
+    pkg.Download(jobs)
   endfor
   Jobwait(jobs, 0)
 enddef
@@ -497,18 +507,6 @@ export def Sync()
   writefile([json_encode(available_packages)], optdir .. '/available_packages.json')
   PostupdatePlugins()
 enddef
-
-# Original: https://github.com/junegunn/vim-plug/blob/e3001/plug.vim#L479-L529
-#  License: MIT, https://raw.githubusercontent.com/junegunn/vim-plug/e3001/LICENSE
-if has('win32')
-  def IsLocalPlug(repo: string): bool
-    return repo =~? '^[a-z]:\|^[%~]'
-  enddef
-else
-  def IsLocalPlug(repo: string): bool
-    return repo[0] =~ '[/$~]'
-  enddef
-endif
 
 def Gets(pkg: dict<any>, keys: list<string>, default: any): any
   final values: list<any> = []
